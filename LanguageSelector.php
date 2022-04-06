@@ -74,10 +74,10 @@ $wgLanguageSelectorLocation = LANGUAGE_SELECTOR_AT_TOP_OF_TEXT;
 
 // register hook handlers
 $wgHooks['AddNewAccount'][] = 'wfLanguageSelectorAddNewAccount';
-$wgHooks['BeforePageDisplay'][] = 'wfLanguageSelectorBeforePageDisplay';
 $wgHooks['GetCacheVaryCookies'][] = 'wfLanguageSelectorGetCacheVaryCookies';
 $wgHooks['ParserFirstCallInit'][] = 'wfLanguageSelectorSetHook';
 $wgHooks['UserGetLanguageObject'][] = 'wfLanguageSelectorGetLanguageCode';
+$wgHooks['MenuSidebarAfterBuild'][] = 'wfLanguageSelectorSidebar';
 
 $wgExtensionFunctions[] = 'wfLanguageSelectorExtension';
 
@@ -103,22 +103,9 @@ function wfLanguageSelectorSetHook( $parser ) {
 }
 
 function wfLanguageSelectorExtension() {
-	global $wgLanguageSelectorLocation, $wgHooks;
-
 	// We'll probably be beaten to this by the call in wfLanguageSelectorGetLanguageCode(),
 	// but just in case, call this to make sure the global is properly initialised
 	wfGetLanguageSelectorLanguages();
-
-	if ( $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_MANUAL && $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_AT_TOP_OF_TEXT ) {
-		switch ( $wgLanguageSelectorLocation ) {
-			case LANGUAGE_SELECTOR_IN_TOOLBOX:
-				$wgHooks['SkinTemplateToolboxEnd'][] = 'wfLanguageSelectorSkinHook';
-				break;
-			default:
-				$wgHooks['SkinTemplateOutputPageBeforeExec'][] = 'wfLanguageSelectorSkinTemplateOutputPageBeforeExec';
-				break;
-		}
-	}
 }
 
 function wfGetLanguageSelectorLanguages() {
@@ -207,42 +194,9 @@ function wfLanguageSelectorGetLanguageCode( $user, &$code ) {
 	return true;
 }
 
-/**
- * @param  $out OutputPage
- * @return bool
- */
-function wfLanguageSelectorBeforePageDisplay( &$out ) {
-	global $wgLanguageSelectorLocation;
-
-	if ( $wgLanguageSelectorLocation == LANGUAGE_SELECTOR_MANUAL ) {
-		return true;
-	}
-
-	if ( $wgLanguageSelectorLocation == LANGUAGE_SELECTOR_AT_TOP_OF_TEXT ) {
-		$html = wfLanguageSelectorHTML( $out->getTitle() );
-		$out->setIndicators( [
-			'languageselector' => $html,
-		] );
-	}
-
-	$out->addModules( 'ext.languageSelector' );
-
-	return true;
-}
-
 function wfLanguageSelectorGetCacheVaryCookies( $out, &$cookies ) {
 	global $wgCookiePrefix;
 	$cookies[] = $wgCookiePrefix . 'LanguageSelectorLanguage';
-	return true;
-}
-
-/**
- * @param $skin Skin
- * @return bool
- */
-function wfLanguageSelectorSkinHook( &$skin ) {
-	$html = wfLanguageSelectorHTML( $skin->getTitle() );
-	print $html;
 	return true;
 }
 
@@ -291,44 +245,20 @@ function wfLanguageSelectorTag( $input, $args, $parser ) {
 	return wfLanguageSelectorHTML( $parser->getTitle(), $style, $class, $selectorstyle, $buttonstyle, $showcode );
 }
 
-/**
- * @param  $skin Skin
- * @param  $tpl QuickTemplate
- * @return bool
- */
-function wfLanguageSelectorSkinTemplateOutputPageBeforeExec( &$skin, &$tpl ) {
-	global $wgLanguageSelectorLocation;
-
-	if ( $wgLanguageSelectorLocation == LANGUAGE_SELECTOR_AS_PORTLET ) {
-		$code = $skin->getLanguage()->getCode();
-		$lines = array();
-		foreach ( wfGetLanguageSelectorLanguages() as $ln ) {
-			$lines[] = array(
-				$href = $skin->getTitle()->getFullURL( 'setlang=' . $ln ),
-				'text' => Language::fetchLanguageName( $ln ),
-				'href' => $href,
-				'id' => 'n-languageselector',
-				'active' => ( $ln == $code ),
-			);
-		}
-
-		$tpl->data['sidebar']['languageselector'] = $lines;
-		return true;
+function wfLanguageSelectorSidebar( $skin, &$bar ) {
+	$lines = [];
+	$code = $skin->getLanguage()->getCode();
+	foreach ( wfGetLanguageSelectorLanguages() as $ln ) {
+		$lines[] = array(
+			$href = $skin->getTitle()->getFullURL( 'setlang=' . $ln ),
+			'text' => Language::fetchLanguageName( $ln ),
+			'href' => $href,
+			'id' => 'n-languageselector-' . $ln,
+			'active' => ( $code === $ln ),
+		);
 	}
 
-	$key = null;
-
-	switch( $wgLanguageSelectorLocation ) {
-		case LANGUAGE_SELECTOR_INTO_SITENOTICE: $key = 'sitenotice'; break;
-		case LANGUAGE_SELECTOR_INTO_TITLE: $key = 'title'; break;
-		case LANGUAGE_SELECTOR_INTO_SUBTITLE: $key = 'subtitle'; break;
-		case LANGUAGE_SELECTOR_INTO_CATLINKS: $key = 'catlinks'; break;
-	}
-
-	if ( $key ) {
-		$html = wfLanguageSelectorHTML( $skin->getTitle() );
-		$tpl->set( $key, $tpl->data[ $key ] . $html );
-	}
+	$bar['languageselector'] = $lines;
 
 	return true;
 }
