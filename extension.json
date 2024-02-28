@@ -54,11 +54,11 @@
 		}
 	},
 	"Hooks": {
-		"BeforePageDisplay": "LanguageSelectorHooks::onBeforePageDisplay",
 		"GetCacheVaryCookies": "LanguageSelectorHooks::onGetCacheVaryCookies",
 		"LocalUserCreated": "LanguageSelectorHooks::onLocalUserCreated",
 		"ParserFirstCallInit": "LanguageSelectorHooks::onParserFirstCallInit",
-		"UserGetLanguageObject": "LanguageSelectorHooks::onUserGetLanguageObject"
+		"UserGetLanguageObject": "LanguageSelectorHooks::onUserGetLanguageObject",
+		"MenuSidebarAfterBuild": "LanguageSelectorHooks::onMenuSidebarAfterBuild"
 	},
 	"manifest_version": 2
 }

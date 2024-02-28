@@ -34,22 +34,9 @@ class LanguageSelectorHooks {
 	}
 
 	public static function extension() {
-		global $wgLanguageSelectorLocation, $wgHooks;
-
 		// We'll probably be beaten to this by the call in onUserGetLanguageObject(),
 		// but just in case, call this to make sure the global is properly initialised
 		self::getLanguageSelectorLanguages();
-
-		if ( $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_MANUAL && $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_AT_TOP_OF_TEXT ) {
-			switch ( $wgLanguageSelectorLocation ) {
-				case LANGUAGE_SELECTOR_IN_TOOLBOX:
-					$wgHooks['SkinAfterPortlet'][] = 'LanguageSelectorHooks::onSkinAfterPortlet';
-					break;
-				default:
-					$wgHooks['SkinTemplateOutputPageBeforeExec'][] = 'LanguageSelectorHooks::onSkinTemplateOutputPageBeforeExec';
-					break;
-			}
-		}
 	}
 
 	/**
@@ -148,44 +135,12 @@ class LanguageSelectorHooks {
 
 	/**
 	 * @param OutputPage $out
-	 * @param Skin $skin
-	 */
-	public static function onBeforePageDisplay( OutputPage $out, Skin $skin ) {
-		global $wgLanguageSelectorLocation;
-
-		if ( $wgLanguageSelectorLocation == LANGUAGE_SELECTOR_MANUAL ) {
-			return;
-		}
-
-		if ( $wgLanguageSelectorLocation == LANGUAGE_SELECTOR_AT_TOP_OF_TEXT ) {
-			$html = self::languageSelectorHTML( $out->getTitle() );
-			$out->setIndicators( [
-				'languageselector' => $html,
-			] );
-		}
-
-		$out->addModules( 'ext.languageSelector' );
-	}
-
-	/**
-	 * @param OutputPage $out
 	 * @param array &$cookies
 	 */
 	public static function onGetCacheVaryCookies( $out, &$cookies ) {
 		global $wgCookiePrefix;
 
 		$cookies[] = $wgCookiePrefix . 'LanguageSelectorLanguage';
-	}
-
-	/**
-	 * @param Skin $skin
-	 * @param string $portlet
-	 * @param string &$html
-	 */
-	public static function onSkinAfterPortlet( Skin $skin, $portlet, &$html ) {
-		if ( $portlet === 'tb' ) {
-			$html .= self::languageSelectorHTML( $skin->getTitle() );
-		}
 	}
 
 	/**
@@ -235,55 +190,6 @@ class LanguageSelectorHooks {
 		$parser->getOutput()->addOutputHook( 'languageselector' );
 
 		return self::languageSelectorHTML( $parser->getTitle(), $style, $class, $selectorstyle, $buttonstyle, $showcode );
-	}
-
-	/**
-	 * @param SkinTemplate $skin
-	 * @param QuickTemplate $tpl
-	 */
-	public static function onSkinTemplateOutputPageBeforeExec( $skin, $tpl ) {
-		global $wgLanguageSelectorLocation;
-
-		if ( $wgLanguageSelectorLocation == LANGUAGE_SELECTOR_AS_PORTLET ) {
-			$code = $skin->getLanguage()->getCode();
-			$lines = [];
-
-			foreach ( self::getLanguageSelectorLanguages() as $ln ) {
-				$lines[] = [
-					$href = $skin->getTitle()->getFullURL( 'setlang=' . $ln ),
-					'text' => Language::fetchLanguageName( $ln ),
-					'href' => $href,
-					'id' => 'n-languageselector',
-					'active' => ( $ln == $code ),
-				];
-			}
-
-			$tpl->data['sidebar']['languageselector'] = $lines;
-
-			return;
-		}
-
-		$key = null;
-
-		switch ( $wgLanguageSelectorLocation ) {
-			case LANGUAGE_SELECTOR_INTO_SITENOTICE:
-				$key = 'sitenotice';
-				break;
-			case LANGUAGE_SELECTOR_INTO_TITLE:
-				$key = 'title';
-				break;
-			case LANGUAGE_SELECTOR_INTO_SUBTITLE:
-				$key = 'subtitle';
-				break;
-			case LANGUAGE_SELECTOR_INTO_CATLINKS:
-				$key = 'catlinks';
-				break;
-		}
-
-		if ( $key ) {
-			$html = self::languageSelectorHTML( $skin->getTitle() );
-			$tpl->set( $key, $tpl->data[$key] . $html );
-		}
 	}
 
 	/**
@@ -370,5 +276,24 @@ class LanguageSelectorHooks {
 		$html .= Xml::closeElement( 'span' );
 
 		return $html;
+	}
+
+	public static function onMenuSidebarAfterBuild( Skin $skin, &$bar ) {
+		$lines = [];
+		$code = $skin->getLanguage()->getCode();
+
+		foreach ( self::getLanguageSelectorLanguages() as $ln ) {
+			$lines[] = [
+				$href = $skin->getTitle()->getFullURL( 'setlang=' . $ln ),
+				'text' => Language::fetchLanguageName( $ln ),
+				'href' => $href,
+				'id' => 'n-languageselector',
+				'active' => ( $code === $ln ),
+			];
+		}
+
+		$bar['languageselector'] = $lines;
+
+		return true;
 	}
 }
