@@ -63,7 +63,8 @@
 		"GetCacheVaryCookies": "main",
 		"LocalUserCreated": "main",
 		"ParserFirstCallInit": "main",
-		"UserGetLanguageObject": "main"
+		"UserGetLanguageObject": "main",
+		"MenuSidebarAfterBuild": "onSkinBuildSidebar"
 	},
 	"manifest_version": 2
 }

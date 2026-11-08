@@ -43,7 +43,11 @@ class LanguageSelectorHooks implements
 		define( 'LANGUAGE_SELECTOR_INTO_SUBTITLE', 13 ); # put after subtitle text
 		define( 'LANGUAGE_SELECTOR_INTO_CATLINKS', 14 ); # put after catlinks text
 
-		$wgLanguageSelectorLocation = LANGUAGE_SELECTOR_AT_TOP_OF_TEXT;
+		// [1.46 迁移] 1.46 的 onRegistration 延迟到 LocalSettings 之后执行，
+		// 不能再用默认值覆盖站点已配置的 $wgLanguageSelectorLocation。
+		if ( $wgLanguageSelectorLocation === null ) {
+			$wgLanguageSelectorLocation = LANGUAGE_SELECTOR_AT_TOP_OF_TEXT;
+		}
 	}
 
 	public static function extension() {
@@ -54,7 +58,7 @@ class LanguageSelectorHooks implements
 		self::getLanguageSelectorLanguages();
 
 		if ( $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_MANUAL && $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_AT_TOP_OF_TEXT ) {
-			$hookContainer = MediaWikiServices::getInstance()->getHookContainer();
+			$hookContainer = \MediaWiki\MediaWikiServices::getInstance()->getHookContainer();
 			switch ( $wgLanguageSelectorLocation ) {
 				case LANGUAGE_SELECTOR_IN_TOOLBOX:
 					$hookContainer->register(
@@ -67,6 +71,8 @@ class LanguageSelectorHooks implements
 						'SkinTemplateOutputPageBeforeExec',
 						[ self::class, 'onSkinTemplateOutputPageBeforeExec' ]
 					);
+					// [1.46 迁移] QuickTemplate 不再暴露 tpl->data，改用 SkinBuildSidebar 注入门户
+					$hookContainer->register( 'SkinBuildSidebar', [ self::class, 'onSkinBuildSidebar' ] );
 					break;
 			}
 		}
@@ -87,7 +93,7 @@ class LanguageSelectorHooks implements
 
 		if ( $wgLanguageSelectorLanguages === null ) {
 			$wgLanguageSelectorLanguages = array_keys(
-				MediaWikiServices::getInstance()->getLanguageNameUtils()->getLanguageNames(
+				\MediaWiki\MediaWikiServices::getInstance()->getLanguageNameUtils()->getLanguageNames(
 					LanguageNameUtils::AUTONYMS,
 					$wgLanguageSelectorShowAll === true ? LanguageNameUtils::DEFINED : LanguageNameUtils::SUPPORTED
 			) );
@@ -119,7 +125,7 @@ class LanguageSelectorHooks implements
 		}
 
 		if ( $setlang && !$user->isAnon() ) {
-			$userOptionsManager = MediaWikiServices::getInstance()->getUserOptionsManager();
+			$userOptionsManager = \MediaWiki\MediaWikiServices::getInstance()->getUserOptionsManager();
 			if ( $setlang != $userOptionsManager->getOption( $user, 'language' ) ) {
 				$userOptionsManager->setOption( $user, 'language', $requestedLanguage );
 				$userOptionsManager->saveOptions( $user );
@@ -136,7 +142,7 @@ class LanguageSelectorHooks implements
 
 					// see if the content language is accepted by the client.
 					if ( $wgLanguageSelectorDetectLanguage != LANGUAGE_SELECTOR_PREFER_CONTENT_LANG
-						|| !array_key_exists( MediaWikiServices::getInstance()->getContentLanguage()->getCode(), $languages ) ) {
+						|| !array_key_exists( \MediaWiki\MediaWikiServices::getInstance()->getContentLanguage()->getCode(), $languages ) ) {
 
 						$supported = self::getLanguageSelectorLanguages();
 						// look for a language that is acceptable to the client
@@ -266,7 +272,7 @@ class LanguageSelectorHooks implements
 			$code = $skin->getLanguage()->getCode();
 			$lines = [];
 
-			$languageNameUtils = MediaWikiServices::getInstance()->getLanguageNameUtils();
+			$languageNameUtils = \MediaWiki\MediaWikiServices::getInstance()->getLanguageNameUtils();
 			foreach ( self::getLanguageSelectorLanguages() as $ln ) {
 				$lines[] = [
 					$href = $skin->getTitle()->getFullURL( 'setlang=' . $ln ),
@@ -316,13 +322,13 @@ class LanguageSelectorHooks implements
 		// if the context user is the created user this means remembering what the user selected
 		// otherwise, it would mean inheriting the language from the user creating the account.
 		if ( $context->getUser() === $user ) {
-			$userOptionsManager = MediaWikiServices::getInstance()->getUserOptionsManager();
+			$userOptionsManager = \MediaWiki\MediaWikiServices::getInstance()->getUserOptionsManager();
 			$userOptionsManager->setOption( $user, 'language', $context->getLanguage()->getCode() );
 		}
 	}
 
 	/**
-	 * @param Title $title
+	 * @param \MediaWiki\Title\Title $title
 	 * @param string $style
 	 * @param string $class
 	 * @param string $selectorstyle
@@ -331,7 +337,7 @@ class LanguageSelectorHooks implements
 	 * @return string
 	 */
 	public static function languageSelectorHTML(
-		Title $title,
+		\MediaWiki\Title\Title $title,
 		string $style = '',
 		string $class = '',
 		string $selectorstyle = '',
@@ -350,13 +356,13 @@ class LanguageSelectorHooks implements
 		$code = $wgLang->getCode();
 
 		$html = '';
-		$html .= Html::openElement( 'span', [
+		$html .= \MediaWiki\Html\Html::openElement( 'span', [
 			'id' => 'languageselector-box-' . $id,
 			'class' => 'languageselector ' . $class,
 			'style' => $style
 		] );
 
-		$html .= Html::openElement( 'form', [
+		$html .= \MediaWiki\Html\Html::openElement( 'form', [
 			'name' => 'languageselector-form-' . $id,
 			'id' => 'languageselector-form-' . $id,
 			'method' => 'get',
@@ -364,29 +370,59 @@ class LanguageSelectorHooks implements
 			'style' => 'display:inline;'
 		] );
 
-		$html .= Html::hidden( 'title', $title->getPrefixedDBkey() );
-		$html .= Html::openElement( 'select', [
+		$html .= \MediaWiki\Html\Html::hidden( 'title', $title->getPrefixedDBkey() );
+		$html .= \MediaWiki\Html\Html::openElement( 'select', [
 			'name' => 'setlang',
 			'id' => 'languageselector-select-' . $id,
 			'style' => $selectorstyle
 		] );
 
-		$languageNameUtils = MediaWikiServices::getInstance()->getLanguageNameUtils();
+		$languageNameUtils = \MediaWiki\MediaWikiServices::getInstance()->getLanguageNameUtils();
 		foreach ( self::getLanguageSelectorLanguages() as $ln ) {
 			$name = $languageNameUtils->getLanguageName( $ln );
 			if ( $showCode ) {
 				$name = LanguageCode::bcp47( $ln ) . ' - ' . $name;
 			}
 
-			$html .= Html::element( 'option', [ 'value' => $ln, 'selected' => $ln == $code ], $name );
+			$html .= \MediaWiki\Html\Html::element( 'option', [ 'value' => $ln, 'selected' => $ln == $code ], $name );
 		}
 
-		$html .= Html::closeElement( 'select' );
-		$html .= Html::submitButton( wfMessage( 'languageselector-setlang' )->text(),
+		$html .= \MediaWiki\Html\Html::closeElement( 'select' );
+		$html .= \MediaWiki\Html\Html::submitButton( wfMessage( 'languageselector-setlang' )->text(),
 			[ 'id' => 'languageselector-commit-' . $id, 'style' => $buttonstyle ] );
-		$html .= Html::closeElement( 'form' );
-		$html .= Html::closeElement( 'span' );
+		$html .= \MediaWiki\Html\Html::closeElement( 'form' );
+		$html .= \MediaWiki\Html\Html::closeElement( 'span' );
 
 		return $html;
 	}
+
+	/**
+	 * [1.46 迁移] 把语言选择器注入侧边栏门户。
+	 * @param Skin $skin
+	 * @param array &$bar
+	 */
+	public static function onSkinBuildSidebar( $skin, &$bar ) {
+		global $wgLanguageSelectorLocation;
+
+		if ( $wgLanguageSelectorLocation != LANGUAGE_SELECTOR_AS_PORTLET ) {
+			return;
+		}
+
+		$code = $skin->getLanguage()->getCode();
+		$lines = [];
+		$languageNameUtils = \MediaWiki\MediaWikiServices::getInstance()->getLanguageNameUtils();
+
+		foreach ( self::getLanguageSelectorLanguages() as $ln ) {
+			$href = $skin->getTitle()->getFullURL( 'setlang=' . $ln );
+			$lines[] = [
+				'text' => $languageNameUtils->getLanguageName( $ln ),
+				'href' => $href,
+				'id' => 'n-languageselector',
+				'active' => ( $ln == $code ),
+			];
+		}
+
+		$bar['languageselector'] = $lines;
+	}
+
 }
